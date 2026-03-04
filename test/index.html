@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auth Demo</title>
+    <style>
+        body {
+            font-family: Arial;
+            width: 300px;
+            margin: 100px auto;
+        }
+        input, button {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+        }
+        .card {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h3>Register</h3>
+    <input id="reg_email" placeholder="Email">
+    <input id="reg_username" type="text" placeholder="Username">
+    <input id="reg_password" type="password" placeholder="Password">
+    <button onclick="register()">Register</button>
+
+    <h3>Login</h3>
+    <input id="login_email" placeholder="Email">
+    <input id="login_password" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+
+    <h3>Profile (Protected)</h3>
+    <button onclick="getProfile()">Get Profile</button>
+
+    <pre id="result"></pre>
+</div>
+
+<script>
+
+let accessToken = ""
+
+async function register(){
+    const res = await fetch("http://localhost:5001/register", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+            email: reg_email.value,
+            password: reg_password.value
+        })
+    })
+    console.log("register触发")
+    show(res)
+}
+
+async function login(){
+    const res = await fetch("http://localhost:5001/login", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+            email: login_email.value,
+            password: login_password.value
+        })
+    })
+    console.log("login触发")
+    const data = await res.json()
+    accessToken = data.access_token
+    result.innerText = JSON.stringify(data, null, 2)
+}
+
+async function getProfile(){
+    const res = await fetch("http://localhost:5001/create_session", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+            email: reg_email.value,
+            password: reg_password.value,
+            username: reg_username.value,
+        })
+    })
+    show(res)
+    console.log("插入数据")
+}
+
+async function show(res){
+    const data = await res.json()
+    result.innerText = JSON.stringify(data, null, 2)
+}
+
+</script>
+
+</body>
+</html>
