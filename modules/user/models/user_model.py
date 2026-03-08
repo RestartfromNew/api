@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from sqlalchemy import Column,String,Text,Boolean,TIMESTAMP
 
-
+from datetime import datetime
 db=SQLAlchemy()
 class User(db.Model):
     __tablename__ = "users"
@@ -16,5 +16,26 @@ class User(db.Model):
     password_hash = Column(Text, nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
     is_verified = Column(Boolean, nullable=False, default=False)
-    created_at = Column(TIMESTAMP, nullable=False, default=DateTime)
-    updated_at= Column(TIMESTAMP, nullable=False, default=DateTime)
+    #时间会自动生成
+    created_at = Column(TIMESTAMP, default=datetime.utcnow)
+
+    updated_at = Column(
+        TIMESTAMP,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+    @classmethod
+    def create(cls,username,email,password_hash):
+        return cls(
+            username=username,
+            email=email,
+            password_hash=password_hash,
+            is_active=True,
+            is_verified=False
+        )
+    def to_dict(self):
+        return {
+            "id": str(self.id),
+            "username": self.username,
+            "email": self.email
+        }
