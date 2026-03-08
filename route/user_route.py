@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify,Blueprint
 from database.database import SessionLocal
 from modules.user.service.create_new_user_service import create_new_user_service
-bp = Blueprint('first_test_route', __name__)
+bp = Blueprint('user_route', __name__)
 
 @bp.route('/register', methods=['POST'])
 def register():
