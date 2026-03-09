@@ -44,7 +44,10 @@ def create_new_user_service(db, data):
             raise ValueError("Username already registered")
 
         password = data.get('password')
-        password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        password_hash = bcrypt.hashpw(
+            password.encode("utf-8"),
+            bcrypt.gensalt()
+        ).decode("utf-8")
         data['password_hash'] = password_hash
         data['is_active'] = True
         new_user= UserDAO.create_user(db,data)

@@ -2,10 +2,11 @@
 <html>
 <head>
     <title>Auth API Test</title>
+
     <style>
         body {
             font-family: Arial;
-            width: 320px;
+            width: 340px;
             margin: 80px auto;
         }
 
@@ -27,7 +28,9 @@
             overflow-x: auto;
         }
     </style>
+
 </head>
+
 
 <body>
 
@@ -50,6 +53,13 @@
 <button onclick="login()">Login</button>
 
 
+<h3>Token Test</h3>
+
+<button onclick="verifyToken()">Verify Access Token</button>
+<button onclick="generate_new_token()">Refresh Token</button>
+<button onclick="verifyAfterRefresh()">Refresh + Retry API</button>
+
+
 <h3>Search User</h3>
 
 <input id="search_email" placeholder="Search by email">
@@ -66,15 +76,19 @@
 </div>
 
 
+
 <script>
 
-let accessToken = ""
+const API_BASE = "http://localhost:5001"
 
+let accessToken = ""
+let refreshToken = ""
 
 function showResult(data){
     const result = document.getElementById("result")
     result.innerText = JSON.stringify(data, null, 2)
 }
+
 
 
 async function register1(){
@@ -83,23 +97,27 @@ async function register1(){
     const email = document.getElementById("reg_email").value
     const password = document.getElementById("reg_password").value
 
-    const res = await fetch("http://localhost:5001/register",{
-        method:"POST",
-        headers:{
-            "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-            username:username,
-            email:email,
-            password:password
+    try{
+
+        const res = await fetch(API_BASE + "/register",{
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json"
+            },
+            body:JSON.stringify({
+                username,
+                email,
+                password
+            })
         })
-    })
 
-    const data = await res.json()
+        const data = await res.json()
 
-    console.log("register触发")
+        showResult(data)
 
-    showResult(data)
+    }catch(err){
+        showResult({error:"Register failed"})
+    }
 }
 
 
@@ -109,24 +127,133 @@ async function login(){
     const email = document.getElementById("login_email").value
     const password = document.getElementById("login_password").value
 
-    const res = await fetch("http://localhost:5001/login",{
-        method:"POST",
-        headers:{
-            "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-            email:email,
-            password:password
+    try{
+
+        const res = await fetch(API_BASE + "/login",{
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json"
+            },
+            body:JSON.stringify({
+                email,
+                password
+            })
         })
-    })
 
-    const data = await res.json()
+        const data = await res.json()
 
-    accessToken = data.access_token
+        if(res.ok){
+            accessToken = data.access_token
+            refreshToken = data.refresh_token
 
-    console.log("login触发")
+            console.log("Access token:", accessToken)
+            console.log("Refresh token:", refreshToken)
+        }
 
-    showResult(data)
+        showResult(data)
+
+    }catch(err){
+        showResult({error:"Login failed"})
+    }
+}
+
+
+
+async function verifyToken(){
+
+    if(!accessToken){
+        alert("Please login first")
+        return
+    }
+
+    try{
+
+        const res = await fetch(API_BASE + "/test_token_get_id",{
+            method:"GET",
+            headers:{
+                "Authorization": "Bearer " + accessToken
+            }
+        })
+
+        const data = await res.json()
+
+        if(res.status === 401){
+
+            showResult({
+                message:"Access token expired. Click Refresh Token."
+            })
+
+            return
+        }
+
+        showResult(data)
+
+    }catch(err){
+        showResult({error:"Request failed"})
+    }
+}
+
+
+
+async function generate_new_token(){
+
+    if(!refreshToken){
+        alert("Please login first")
+        return
+    }
+
+    try{
+
+        const res = await fetch(API_BASE + "/refresh",{
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json"
+            },
+            body:JSON.stringify({
+                refresh_token: refreshToken
+            })
+        })
+
+        const data = await res.json()
+
+        if(res.ok){
+            accessToken = data.access_token
+            console.log("New access token:", accessToken)
+        }
+
+        showResult(data)
+
+    }catch(err){
+        showResult({error:"Refresh failed"})
+    }
+}
+
+
+
+async function verifyAfterRefresh(){
+
+    await generate_new_token()
+
+    if(!accessToken){
+        return
+    }
+
+    try{
+
+        const res = await fetch(API_BASE + "/test_token_get_id",{
+            method:"GET",
+            headers:{
+                "Authorization": "Bearer " + accessToken
+            }
+        })
+
+        const data = await res.json()
+
+        showResult(data)
+
+    }catch(err){
+        showResult({error:"Retry failed"})
+    }
 }
 
 
@@ -136,7 +263,7 @@ async function searchByEmail(){
     const email = document.getElementById("search_email").value
 
     const res = await fetch(
-        `http://localhost:5001/search_by_id_username_email?email=${encodeURIComponent(email)}`
+        API_BASE + `/search_by_id_username_email?email=${encodeURIComponent(email)}`
     )
 
     const data = await res.json()
@@ -151,14 +278,13 @@ async function searchByUsername(){
     const username = document.getElementById("search_username").value
 
     const res = await fetch(
-        `http://localhost:5001/search_by_id_username_email?username=${encodeURIComponent(username)}`
+        API_BASE + `/search_by_id_username_email?username=${encodeURIComponent(username)}`
     )
 
     const data = await res.json()
 
     showResult(data)
 }
-
 
 </script>
 
