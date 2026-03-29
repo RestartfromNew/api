@@ -1,0 +1,87 @@
+
+import bcrypt
+from modules.user.dao.userDAO import UserDAO
+import re
+from password_validator import PasswordValidator
+
+# 定义规则
+schema = PasswordValidator()
+schema.min(8)           # 最少8位
+schema.max(100)         # 最多100位
+schema.has().uppercase() # 至少1个大写
+schema.has().lowercase() # 至少1个小写
+schema.has().digits()    # 至少1个数字
+schema.has().symbols()   # 至少1个符号
+schema.has().no().spaces() # 不能有空格
+# 验证密码
+def is_validate_password(password: str) -> bool:
+    return schema.validate(password)
+
+
+EMAIL_REGEX = r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
+
+
+def is_valid_email(email: str) -> bool:
+    # email是否符合格式
+    return re.match(EMAIL_REGEX, email)
+def is_empty(value):
+    return value is None or str(value).strip() == ""
+
+class CreateNewUserService:
+
+
+    def create_new_user_service(db, data):
+        try:
+            #验证密码和邮箱是否符合格式
+            if not is_valid_email(data['email']):
+                raise ValueError("Invalid email format")
+            if not is_validate_password(data['password']):
+                raise ValueError("Invalid password format")
+            username=data['username']
+            email=data['email']
+            # userbyId=UserDAO.get_by_username(db, username)
+            userbyEmail=UserDAO.get_by_email(db, email)
+            #验证邮箱和用户名是否存在
+            if  userbyEmail:
+                raise ValueError("Email already registered")
+            # if userbyId:
+            #     raise ValueError("Username already registered")
+
+            password = data.get('password')
+            password_hash = bcrypt.hashpw(
+                password.encode("utf-8"),
+                bcrypt.gensalt()
+            ).decode("utf-8")
+            data['password_hash'] = password_hash
+            data['is_active'] = True
+            new_user= UserDAO.create_user(db,data)
+            print("提交成功")
+            return new_user
+        except Exception as e:
+            print(e)
+            raise e
+    def create_oauth_user(db,data):
+        #表示oauth表中没有该用户，1，该email已经被注册2.email没有被注册
+        try:
+            provider=data['provider']
+            provider_user_id=data['provider_user_id']
+            email=data['email']
+            username=data['username']
+            existing_user=UserDAO.get_by_email(db, email)
+            if existing_user:
+                #如果Oauth使用的邮箱已经存在一个用户了
+                return existing_user
+            if is_empty(email):
+                #用后八位生成用户
+                email=f"{provider}_{provider_user_id[-8:]}@oauth.local"
+            if is_empty(username):
+                username=f"{provider}_{provider_user_id[-6:]}"
+            data={
+                "username": username,
+                "email": email,
+            }
+            new_user= UserDAO.create_oauth_user(db,data)
+            return new_user
+        except Exception as e:
+            print(e)
+            raise e

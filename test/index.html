@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Character System</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            display: flex;
+            justify-content: center;
+            margin-top: 40px;
+        }
+
+        .container {
+            display: flex;
+            gap: 40px;
+        }
+
+        .card {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+            width: 350px;
+        }
+
+        input, textarea, button {
+            width: 100%;
+            padding: 8px;
+            margin: 6px 0;
+        }
+
+        #character_section {
+            display: none;
+        }
+
+        .divider {
+            text-align: center;
+            margin: 10px 0;
+            color: #888;
+        }
+
+        #chat_box {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            background: #fafafa;
+        }
+
+        .message {
+            margin: 6px 0;
+            padding: 8px 12px;
+            border-radius: 12px;
+            max-width: 70%;
+        }
+
+        .user {
+            background: #d2f8d2;
+            margin-left: auto;
+        }
+
+        .assistant {
+            background: #ffffff;
+            border: 1px solid #ddd;
+            margin-right: auto;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+<!-- 登录 + 注册 + OAuth -->
+<div class="card">
+
+    <h3>Login</h3>
+    <input id="login_email" placeholder="Email">
+    <input id="login_password" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+
+    <div class="divider">OR</div>
+
+    <!-- Google 手动输入 -->
+    <h4>Mock Google Login</h4>
+    <input id="google_email" placeholder="Email">
+    <input id="google_username" placeholder="Username">
+    <input id="google_user_id" placeholder="Provider User ID">
+    <button onclick="googleLogin()">Google Login</button>
+
+    <div class="divider">Register</div>
+
+    <!-- 注册 -->
+    <input id="reg_email" placeholder="Email">
+    <input id="reg_username" placeholder="Username">
+    <input id="reg_password" type="password" placeholder="Password">
+    <button onclick="register()">Register</button>
+
+</div>
+
+<!-- 右侧 -->
+<div class="card" id="character_section">
+
+    <h3>Session</h3>
+
+    <input id="session_character_id" placeholder="Character ID">
+    <button onclick="getOrCreateSession()">Get Session</button>
+
+    <input id="session_id" placeholder="Session ID">
+    <button onclick="loadHistory()">Load History</button>
+
+    <div id="chat_box"></div>
+
+    <hr>
+
+    <textarea id="message_input" placeholder="Type message..."></textarea>
+
+    <button onclick="sendMessage('user')">Send as User</button>
+    <button onclick="sendMessage('assistant')">Send as Assistant</button>
+
+</div>
+
+</div>
+
+<pre id="result"></pre>
+
+<script>
+
+const API_BASE = "http://localhost:5001"
+
+let accessToken = ""
+
+// ---------------- LOGIN ----------------
+async function login(){
+
+    const user_info = document.getElementById("login_email").value
+    const password = document.getElementById("login_password").value
+
+    const res = await fetch(API_BASE + "/login",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ user_info, password })
+    })
+
+    const data = await res.json()
+
+    if(res.ok){
+        accessToken = data.data.access_token
+        document.getElementById("character_section").style.display = "block"
+    }
+
+    showResult(data)
+}
+
+// ---------------- REGISTER ----------------
+async function register(){
+
+    const email = document.getElementById("reg_email").value
+    const username = document.getElementById("reg_username").value
+    const password = document.getElementById("reg_password").value
+
+    const res = await fetch(API_BASE + "/register", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+            email,
+            username,
+            password
+        })
+    })
+
+    const data = await res.json()
+    showResult(data)
+}
+
+// ---------------- GOOGLE LOGIN ----------------
+async function googleLogin(){
+
+    const email = document.getElementById("google_email").value
+    const username = document.getElementById("google_username").value
+    const user_id = document.getElementById("google_user_id").value
+
+    const res = await fetch(API_BASE + "/auth/login-sync", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+            firebase_token: "mock_token",
+            user_email: email,
+            user_name: username,
+            user_id: user_id,
+            provider: "google",
+            timestamp: Date.now(),
+            app_version: "1.0"
+        })
+    })
+
+    const data = await res.json()
+
+    if(res.ok){
+        accessToken = data.access_token
+        document.getElementById("character_section").style.display = "block"
+    }
+
+    showResult(data)
+}
+
+// ---------------- session ----------------
+async function getOrCreateSession(){
+
+    const character_id = document.getElementById("session_character_id").value
+
+    const res = await fetch(API_BASE + "/characters/get_or_create_chat_session", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + accessToken
+        },
+        body: JSON.stringify({ character_id })
+    })
+
+    const data = await res.json()
+
+    if(data.data){
+        document.getElementById("session_id").value = data.data.id
+    }
+
+    showResult(data)
+}
+
+// ---------------- history ----------------
+async function loadHistory(){
+
+    const session_id = document.getElementById("session_id").value
+
+    const res = await fetch(API_BASE + "/characters/history", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + accessToken
+        },
+        body: JSON.stringify({ session_id })
+    })
+
+    const data = await res.json()
+
+    showResult(data)
+    renderChat(data.data)
+}
+
+// ---------------- 渲染 ----------------
+function renderChat(messages){
+
+    const chatBox = document.getElementById("chat_box")
+    chatBox.innerHTML = ""
+
+    messages.forEach(msg => {
+        appendMessage(msg.role, msg.content)
+    })
+}
+
+// ---------------- append ----------------
+function appendMessage(role, content){
+
+    const chatBox = document.getElementById("chat_box")
+
+    const div = document.createElement("div")
+    div.className = "message " + role
+    div.innerText = content
+
+    chatBox.appendChild(div)
+    chatBox.scrollTop = chatBox.scrollHeight
+}
+
+// ---------------- send ----------------
+async function sendMessage(role){
+
+    const session_id = document.getElementById("session_id").value
+    const content = document.getElementById("message_input").value
+
+    if(!session_id){
+        alert("No session_id")
+        return
+    }
+
+    if(!content){
+        alert("Empty message")
+        return
+    }
+
+    appendMessage(role, content)
+
+    const res = await fetch(API_BASE + "/characters/save_new_message", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + accessToken
+        },
+        body: JSON.stringify({
+            session_id,
+            role,
+            content
+        })
+    })
+
+    const data = await res.json()
+    showResult(data)
+
+    document.getElementById("message_input").value = ""
+}
+
+function showResult(data){
+    document.getElementById("result").innerText =
+        JSON.stringify(data, null, 2)
+}
+
+</script>
+
+</body>
+</html>
